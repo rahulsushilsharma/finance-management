@@ -12,11 +12,13 @@ import { Household } from '@/pages/Household'
 import { Dashboard } from '@/pages/Dashboard'
 import { Transactions } from '@/pages/Transactions'
 import { Budgets } from '@/pages/Budgets'
+import { Settings } from '@/pages/Settings'
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/transactions': 'Transactions',
   '/budgets': 'Budgets',
+  '/settings': 'Settings',
 }
 
 function Layout() {
@@ -77,6 +79,7 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: 'transactions', element: <Transactions /> },
       { path: 'budgets', element: <Budgets /> },
+      { path: 'settings', element: <Settings /> },
     ],
   },
 ])

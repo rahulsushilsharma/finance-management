@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TrendingDown, TrendingUp, ChevronLeft } from 'lucide-react'
 import { useHousehold } from '@/hooks/useHousehold'
 import { addTransaction } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
@@ -58,10 +59,10 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="sm:max-w-sm w-full p-0 gap-0 overflow-hidden">
+      <DialogContent className="sm:max-w-sm w-full p-0 gap-0 overflow-hidden rounded-2xl">
         <DialogHeader className="px-5 pt-5 pb-3">
-          <DialogTitle className="text-base">
-            {type == null ? 'What are you adding?' : type === 'expense' ? '💸 Expense' : '💰 Income'}
+          <DialogTitle className="text-base font-semibold">
+            {type == null ? 'Add transaction' : type === 'expense' ? 'Add expense' : 'Add income'}
           </DialogTitle>
         </DialogHeader>
 
@@ -69,42 +70,49 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
           <div className="flex gap-3 p-5 pt-2">
             <button
               onClick={() => setType('expense')}
-              className="flex-1 rounded-xl border-2 border-destructive/40 bg-destructive/5 hover:bg-destructive/10 active:scale-95 transition-all py-8 flex flex-col items-center gap-2"
+              className="flex-1 rounded-xl border-2 border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 active:scale-95 transition-all py-8 flex flex-col items-center gap-3"
             >
-              <span className="text-4xl">💸</span>
-              <span className="font-semibold text-destructive">Expense</span>
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                <TrendingDown size={22} className="text-red-600 dark:text-red-400" />
+              </div>
+              <span className="font-semibold text-red-600 dark:text-red-400">Expense</span>
             </button>
             <button
               onClick={() => setType('income')}
-              className="flex-1 rounded-xl border-2 border-green-500/40 bg-green-500/5 hover:bg-green-500/10 active:scale-95 transition-all py-8 flex flex-col items-center gap-2"
+              className="flex-1 rounded-xl border-2 border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 active:scale-95 transition-all py-8 flex flex-col items-center gap-3"
             >
-              <span className="text-4xl">💰</span>
+              <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                <TrendingUp size={22} className="text-green-600 dark:text-green-400" />
+              </div>
               <span className="font-semibold text-green-600 dark:text-green-400">Income</span>
             </button>
           </div>
         ) : (
           <div className="px-5 pb-5 space-y-4">
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Amount *</Label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                autoFocus
-                placeholder="0.00"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                className="text-3xl font-bold h-16 text-center tracking-tight"
-              />
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Amount *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  autoFocus
+                  placeholder="0.00"
+                  value={form.amount}
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  className="text-2xl font-bold h-14 text-center pl-6 tracking-tight"
+                />
+              </div>
             </div>
 
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">
-                Description <span className="opacity-50">(optional)</span>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">
+                Description <span className="opacity-40">optional</span>
               </Label>
               <Input
-                placeholder="Groceries, salary..."
+                placeholder={type === 'income' ? 'Salary, freelance...' : 'Groceries, rent...'}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
@@ -112,8 +120,8 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">
-                  Category <span className="opacity-50">(optional)</span>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">
+                  Category <span className="opacity-40">optional</span>
                 </Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v ?? '' })}>
                   <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
@@ -123,8 +131,8 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
                 </Select>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">
-                  Date <span className="opacity-50">(optional)</span>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">
+                  Date <span className="opacity-40">optional</span>
                 </Label>
                 <Input
                   type="date"
@@ -135,8 +143,12 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
             </div>
 
             <div className="flex gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setType(null)}>← Back</Button>
-              <Button className="flex-1" disabled={!form.amount} onClick={handleSave}>Save</Button>
+              <Button variant="ghost" size="sm" onClick={() => setType(null)} className="gap-1 text-muted-foreground">
+                <ChevronLeft size={14} /> Back
+              </Button>
+              <Button className="flex-1" disabled={!form.amount} onClick={handleSave}>
+                Save
+              </Button>
             </div>
           </div>
         )}

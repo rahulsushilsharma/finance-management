@@ -4,16 +4,39 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
     match /households/{hid} {
-      // any authed user can create a household doc
       allow create: if request.auth != null;
-      // only household members can read/update/delete
-      allow read, update, delete: if request.auth != null &&
+      allow read, update, delete: if isMember(hid);
+
+      match /transactions/{tid} {
+        allow read, write: if isMember(hid);
+      }
+
+      match /budgets/{bid} {
+        allow read, write: if isMember(hid);
+      }
+
+      match /members/{uid} {
+        // any member can read the members list
+        allow read: if isMember(hid);
+        // only admin can remove others; anyone can remove themselves (leave)
+        allow delete: if request.auth.uid == uid || isAdmin(hid);
+        // join: write your own member doc
+        allow create: if request.auth.uid == uid;
+        // admin can update any member; member can update themselves
+        allow update: if request.auth.uid == uid || isAdmin(hid);
+      }
+    }
+
+    function isMember(hid) {
+      return request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.householdId == hid;
     }
-    match /households/{hid}/{document=**} {
-      allow read, write: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.householdId == hid;
+
+    function isAdmin(hid) {
+      return isMember(hid) &&
+        get(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid)).data.role == 'admin';
     }
   }
 }

@@ -5,7 +5,7 @@ import { useAuth } from './useAuth'
 interface HouseholdState {
   householdId: string | null
   loading: boolean
-  setHouseholdId: (id: string) => void
+  setHouseholdId: (id: string | null) => void
 }
 
 export function useHousehold(): HouseholdState {

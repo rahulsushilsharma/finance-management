@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { useStore } from '@/store/useStore'
+import { useHousehold } from '@/hooks/useHousehold'
+import { listenTransactions, deleteTransaction } from '@/lib/firestore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,16 +13,22 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
+import type { Transaction } from '@/types'
 
 export function Transactions() {
-  const { transactions, deleteTransaction } = useStore()
-  const [filterType, setFilterType] = useState<string>('all')
-  const [filterMonth, setFilterMonth] = useState<string>('')
+  const { selectedMonth, setSelectedMonth } = useStore()
+  const { householdId } = useHousehold()
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [filterType, setFilterType] = useState('all')
   const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    if (!householdId) return
+    return listenTransactions(householdId, selectedMonth, setTransactions)
+  }, [householdId, selectedMonth])
 
   const filtered = transactions
     .filter((t) => filterType === 'all' || t.type === filterType)
-    .filter((t) => !filterMonth || t.date.startsWith(filterMonth))
     .filter(
       (t) =>
         !search ||
@@ -29,9 +37,13 @@ export function Transactions() {
     )
     .sort((a, b) => b.date.localeCompare(a.date))
 
+  function handleDelete(id: string) {
+    if (!householdId) return
+    deleteTransaction(householdId, id)
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-4">
-      {/* filters */}
       <div className="flex flex-wrap gap-2">
         <Input
           placeholder="Search..."
@@ -51,8 +63,8 @@ export function Transactions() {
         </Select>
         <Input
           type="month"
-          value={filterMonth}
-          onChange={(e) => setFilterMonth(e.target.value)}
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
           className="w-40"
         />
       </div>
@@ -77,19 +89,13 @@ export function Transactions() {
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span
-                  className={`text-sm font-semibold ${
-                    t.type === 'income'
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-red-600 dark:text-red-400'
-                  }`}
-                >
+                <span className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => deleteTransaction(t.id)}
+                  onClick={() => handleDelete(t.id)}
                   className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
                 >
                   ✕

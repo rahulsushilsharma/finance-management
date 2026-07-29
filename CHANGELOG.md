@@ -1,6 +1,25 @@
 # Changelog
 
-## v1.0.0
+## v2.1.0 — Firestore Read/Write Optimisation
+
+### Problem
+Each page (Dashboard, Transactions, Budgets) opened its own `onSnapshot` listener for the same month's transactions. Navigating between pages tore down and re-opened listeners, billing unnecessary Firestore reads. Budgets page opened two listeners simultaneously (transactions + budgets) for data Dashboard already had.
+
+### Changes
+- **Lifted listeners to Layout level** — single `listenTransactions` + `listenBudgets` for the selected month, shared via React context (`DataProvider`). All pages read from context, zero duplicate listeners.
+- **Month cache** — past month data stored in a `Map` keyed by month string. Navigating back to a previously loaded past month skips re-fetch. Current month always re-subscribes (live data).
+- **Removed per-page listeners** — Dashboard, Transactions, Budgets no longer call `listenTransactions` / `listenBudgets` directly.
+
+### Files changed
+- `src/hooks/useData.ts` — new context + provider with shared listeners and month cache
+- `src/App.tsx` — wrap Layout in `DataProvider`
+- `src/pages/Dashboard.tsx` — reads from `useData()`
+- `src/pages/Transactions.tsx` — reads from `useData()`
+- `src/pages/Budgets.tsx` — reads from `useData()`
+
+---
+
+## v2.0.0 — Auth + Firestore
 
 ### Stack
 - Vite + React 19 + TypeScript + SWC

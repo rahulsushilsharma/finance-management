@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useStore } from '@/store/useStore'
+import { useHousehold } from '@/hooks/useHousehold'
+import { addTransaction } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,7 +28,7 @@ const EMPTY = {
 }
 
 export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const addTransaction = useStore((s) => s.addTransaction)
+  const { householdId } = useHousehold()
   const [type, setType] = useState<TransactionType | null>(null)
   const [form, setForm] = useState(EMPTY)
 
@@ -41,12 +42,12 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
     onClose()
   }
 
-  function handleSave() {
-    if (!type || !form.amount) return
-    addTransaction({
+  async function handleSave() {
+    if (!type || !form.amount || !householdId) return
+    await addTransaction(householdId, {
       type,
       amount: parseFloat(form.amount),
-      category: form.category || (type === 'income' ? 'Other' : 'Other'),
+      category: form.category || 'Other',
       description: form.description || (type === 'income' ? 'Income' : 'Expense'),
       date: form.date,
     })
@@ -99,7 +100,9 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
             </div>
 
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Description <span className="opacity-50">(optional)</span></Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">
+                Description <span className="opacity-50">(optional)</span>
+              </Label>
               <Input
                 placeholder="Groceries, salary..."
                 value={form.description}
@@ -109,20 +112,20 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Category <span className="opacity-50">(optional)</span></Label>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Category <span className="opacity-50">(optional)</span>
+                </Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v ?? '' })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pick one" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
                   <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
+                    {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Date <span className="opacity-50">(optional)</span></Label>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Date <span className="opacity-50">(optional)</span>
+                </Label>
                 <Input
                   type="date"
                   value={form.date}
@@ -132,16 +135,8 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
             </div>
 
             <div className="flex gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setType(null)}>
-                ← Back
-              </Button>
-              <Button
-                className="flex-1"
-                disabled={!form.amount}
-                onClick={handleSave}
-              >
-                Save
-              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setType(null)}>← Back</Button>
+              <Button className="flex-1" disabled={!form.amount} onClick={handleSave}>Save</Button>
             </div>
           </div>
         )}

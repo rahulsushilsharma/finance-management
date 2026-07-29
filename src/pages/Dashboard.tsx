@@ -1,30 +1,40 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format, addMonths, subMonths, parseISO } from 'date-fns'
 import { useStore } from '@/store/useStore'
+import { useHousehold } from '@/hooks/useHousehold'
+import { listenTransactions } from '@/lib/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, currentMonth } from '@/lib/utils'
+import type { Transaction } from '@/types'
 
 function toMonthDate(month: string) {
   return parseISO(month + '-01')
 }
 
 export function Dashboard() {
-  const transactions = useStore((s) => s.transactions)
-  const [month, setMonth] = useState(currentMonth())
+  const { selectedMonth, setSelectedMonth } = useStore()
+  const { householdId } = useHousehold()
+  const [transactions, setTransactions] = useState<Transaction[]>([])
 
-  const isCurrentMonth = month === currentMonth()
+  const isCurrentMonth = selectedMonth === currentMonth()
 
-  const { income, expenses, balance, monthTxns } = useMemo(() => {
-    const monthly = transactions.filter((t) => t.date.startsWith(month))
-    const income = monthly.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = monthly.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    const monthTxns = [...monthly].sort((a, b) => b.date.localeCompare(a.date))
-    return { income, expenses, balance: income - expenses, monthTxns }
-  }, [transactions, month])
+  useEffect(() => {
+    if (!householdId) return
+    return listenTransactions(householdId, selectedMonth, setTransactions)
+  }, [householdId, selectedMonth])
 
-  function prev() { setMonth((m) => format(subMonths(toMonthDate(m), 1), 'yyyy-MM')) }
-  function next() { setMonth((m) => format(addMonths(toMonthDate(m), 1), 'yyyy-MM')) }
+  const { income, expenses } = useMemo(() => {
+    const income = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const expenses = transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    return { income, expenses }
+  }, [transactions])
+
+  const balance = income - expenses
+  const sorted = [...transactions].sort((a, b) => b.date.localeCompare(a.date))
+
+  function prev() { setSelectedMonth(format(subMonths(toMonthDate(selectedMonth), 1), 'yyyy-MM')) }
+  function next() { setSelectedMonth(format(addMonths(toMonthDate(selectedMonth), 1), 'yyyy-MM')) }
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -32,12 +42,10 @@ export function Dashboard() {
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={prev}>‹</Button>
         <div className="text-center">
-          <p className="font-semibold text-sm">
-            {format(toMonthDate(month), 'MMMM yyyy')}
-          </p>
+          <p className="font-semibold text-sm">{format(toMonthDate(selectedMonth), 'MMMM yyyy')}</p>
           {!isCurrentMonth && (
             <button
-              onClick={() => setMonth(currentMonth())}
+              onClick={() => setSelectedMonth(currentMonth())}
               className="text-xs text-primary underline underline-offset-2"
             >
               Back to today
@@ -55,41 +63,35 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* income / expense row */}
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardContent className="pt-4 pb-4">
             <p className="text-xs text-muted-foreground mb-1">Income</p>
-            <p className="text-xl font-semibold text-green-600 dark:text-green-400">
-              +{formatCurrency(income)}
-            </p>
+            <p className="text-xl font-semibold text-green-600 dark:text-green-400">+{formatCurrency(income)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-4">
             <p className="text-xs text-muted-foreground mb-1">Expenses</p>
-            <p className="text-xl font-semibold text-red-600 dark:text-red-400">
-              -{formatCurrency(expenses)}
-            </p>
+            <p className="text-xl font-semibold text-red-600 dark:text-red-400">-{formatCurrency(expenses)}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* transactions for selected month */}
       <Card>
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-sm font-semibold">
-            {isCurrentMonth ? 'This month' : format(toMonthDate(month), 'MMMM')}
+            {isCurrentMonth ? 'This month' : format(toMonthDate(selectedMonth), 'MMMM')}
           </CardTitle>
         </CardHeader>
         <CardContent className="pb-2">
-          {monthTxns.length === 0 ? (
+          {sorted.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               {isCurrentMonth ? 'No transactions yet. Tap + to add one.' : 'No transactions this month.'}
             </p>
           ) : (
             <ul className="divide-y divide-border">
-              {monthTxns.map((t) => (
+              {sorted.map((t) => (
                 <li key={t.id} className="flex items-center justify-between py-3 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-lg shrink-0">{t.type === 'income' ? '💰' : '💸'}</span>
@@ -99,16 +101,10 @@ export function Dashboard() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-sm font-semibold ${
-                      t.type === 'income'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
+                    <p className={`text-sm font-semibold ${t.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(t.date), 'MMM d')}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{format(new Date(t.date), 'MMM d')}</p>
                   </div>
                 </li>
               ))}

@@ -1,5 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useStore } from '@/store/useStore'
+import { useHousehold } from '@/hooks/useHousehold'
+import { listenBudgets, listenTransactions, addBudget, updateBudget, deleteBudget } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,42 +22,55 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { EXPENSE_CATEGORIES } from '@/lib/constants'
 import { formatCurrency, currentMonth } from '@/lib/utils'
+import type { Budget, Transaction } from '@/types'
 
 export function Budgets() {
-  const { budgets, transactions, addBudget, updateBudget, deleteBudget } = useStore()
+  const { selectedMonth } = useStore()
+  const { householdId } = useHousehold()
+  const [budgets, setBudgets] = useState<Budget[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({ category: '', monthlyLimit: '', month: currentMonth() })
 
+  useEffect(() => {
+    if (!householdId) return
+    const unsub1 = listenBudgets(householdId, selectedMonth, setBudgets)
+    const unsub2 = listenTransactions(householdId, selectedMonth, setTransactions)
+    return () => { unsub1(); unsub2() }
+  }, [householdId, selectedMonth])
+
   const spentMap = useMemo(() => {
     const map: Record<string, number> = {}
-    transactions
-      .filter((t) => t.type === 'expense')
-      .forEach((t) => {
-        const key = `${t.category}:${t.date.slice(0, 7)}`
-        map[key] = (map[key] ?? 0) + t.amount
-      })
+    transactions.filter((t) => t.type === 'expense').forEach((t) => {
+      map[t.category] = (map[t.category] ?? 0) + t.amount
+    })
     return map
   }, [transactions])
 
   function openAdd() {
     setEditId(null)
-    setForm({ category: '', monthlyLimit: '', month: currentMonth() })
+    setForm({ category: '', monthlyLimit: '', month: selectedMonth })
     setOpen(true)
   }
 
-  function openEdit(b: (typeof budgets)[0]) {
+  function openEdit(b: Budget) {
     setEditId(b.id)
     setForm({ category: b.category, monthlyLimit: String(b.monthlyLimit), month: b.month })
     setOpen(true)
   }
 
-  function handleSubmit() {
-    if (!form.category || !form.monthlyLimit || !form.month) return
+  async function handleSubmit() {
+    if (!householdId || !form.category || !form.monthlyLimit || !form.month) return
     const data = { category: form.category, monthlyLimit: parseFloat(form.monthlyLimit), month: form.month }
-    if (editId != null) updateBudget(editId, data)
-    else addBudget(data)
+    if (editId != null) await updateBudget(householdId, editId, data)
+    else await addBudget(householdId, data)
     setOpen(false)
+  }
+
+  async function handleDelete(id: string) {
+    if (!householdId) return
+    await deleteBudget(householdId, id)
   }
 
   return (
@@ -69,7 +84,7 @@ export function Budgets() {
       ) : (
         <div className="grid gap-3">
           {budgets.map((b) => {
-            const spent = spentMap[`${b.category}:${b.month}`] ?? 0
+            const spent = spentMap[b.category] ?? 0
             const pct = Math.min((spent / b.monthlyLimit) * 100, 100)
             const over = spent > b.monthlyLimit
             return (
@@ -80,21 +95,12 @@ export function Budgets() {
                       <span className="font-medium">{b.category}</span>
                       <span className="text-muted-foreground text-sm ml-2">{b.month}</span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">
                         {formatCurrency(spent)} / {formatCurrency(b.monthlyLimit)}
                       </span>
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(b)}>
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteBudget(b.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        Delete
-                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(b)}>Edit</Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(b.id)} className="text-destructive hover:text-destructive">Delete</Button>
                     </div>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
@@ -105,11 +111,7 @@ export function Budgets() {
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
                     <span>{pct.toFixed(0)}% used</span>
-                    <span>
-                      {over
-                        ? `Over by ${formatCurrency(spent - b.monthlyLimit)}`
-                        : `${formatCurrency(b.monthlyLimit - spent)} left`}
-                    </span>
+                    <span>{over ? `Over by ${formatCurrency(spent - b.monthlyLimit)}` : `${formatCurrency(b.monthlyLimit - spent)} left`}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -126,46 +128,24 @@ export function Budgets() {
           <div className="space-y-4 py-2">
             <div className="space-y-1">
               <Label>Category</Label>
-              <Select
-                value={form.category}
-                onValueChange={(v) => setForm({ ...form, category: v ?? '' })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v ?? '' })}>
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  {EXPENSE_CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
+                  {EXPENSE_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label>Monthly Limit</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.monthlyLimit}
-                onChange={(e) => setForm({ ...form, monthlyLimit: e.target.value })}
-                placeholder="500.00"
-              />
+              <Input type="number" min="0" step="0.01" value={form.monthlyLimit} onChange={(e) => setForm({ ...form, monthlyLimit: e.target.value })} placeholder="500.00" />
             </div>
             <div className="space-y-1">
               <Label>Month</Label>
-              <Input
-                type="month"
-                value={form.month}
-                onChange={(e) => setForm({ ...form, month: e.target.value })}
-              />
+              <Input type="month" value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={handleSubmit}>{editId ? 'Save' : 'Add'}</Button>
           </DialogFooter>
         </DialogContent>

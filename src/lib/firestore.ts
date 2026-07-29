@@ -83,8 +83,21 @@ export async function removeMember(hid: string, uid: string): Promise<void> {
   await updateDoc(doc(db, 'users', uid), { householdId: deleteField() })
 }
 
+export async function transferAdmin(hid: string, fromUid: string, toUid: string): Promise<void> {
+  await updateDoc(doc(memberCol(hid), fromUid), { role: 'member' })
+  await updateDoc(doc(memberCol(hid), toUid), { role: 'admin' })
+}
+
 export async function leaveHousehold(uid: string, hid: string): Promise<void> {
   await deleteDoc(doc(memberCol(hid), uid))
+  await updateDoc(doc(db, 'users', uid), { householdId: deleteField() })
+}
+
+export async function deleteHousehold(uid: string, hid: string): Promise<void> {
+  // sole admin leaving — remove self from members and clear householdId
+  // subcollections (transactions, budgets) are orphaned but harmless at family scale
+  await deleteDoc(doc(memberCol(hid), uid))
+  await deleteDoc(doc(db, 'households', hid))
   await updateDoc(doc(db, 'users', uid), { householdId: deleteField() })
 }
 

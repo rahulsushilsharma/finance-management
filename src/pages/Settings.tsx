@@ -1,14 +1,36 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Check, LogOut, UserMinus, Crown, User } from 'lucide-react'
+import { Copy, Check, LogOut, UserMinus, Crown, User, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useHousehold } from '@/hooks/useHousehold'
 import { signOut } from '@/lib/auth'
-import { listenMembers, removeMember, leaveHousehold, updateDisplayName, type Member } from '@/lib/firestore'
+import {
+  listenMembers,
+  removeMember,
+  leaveHousehold,
+  deleteHousehold,
+  transferAdmin,
+  updateDisplayName,
+  type Member,
+} from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 export function Settings() {
@@ -21,8 +43,14 @@ export function Settings() {
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  // transfer admin dialog
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferTo, setTransferTo] = useState('')
+  const [transferring, setTransferring] = useState(false)
+
   const me = members.find((m) => m.uid === user?.uid)
   const isAdmin = me?.role === 'admin'
+  const otherMembers = members.filter((m) => m.uid !== user?.uid)
 
   useEffect(() => {
     if (!householdId) return
@@ -48,10 +76,35 @@ export function Settings() {
     await removeMember(householdId, uid)
   }
 
-  async function handleLeave() {
+  // switch or leave household — clears householdId, goes back to onboarding
+  async function handleSwitch() {
     if (!user || !householdId) return
+
+    if (isAdmin && otherMembers.length > 0) {
+      // must transfer admin first
+      setTransferTo(otherMembers[0].uid)
+      setTransferOpen(true)
+      return
+    }
+
+    if (isAdmin && otherMembers.length === 0) {
+      // sole member — delete household entirely
+      await deleteHousehold(user.uid, householdId)
+    } else {
+      await leaveHousehold(user.uid, householdId)
+    }
+
+    setHouseholdId(null)
+    navigate('/')
+  }
+
+  async function handleTransferAndLeave() {
+    if (!user || !householdId || !transferTo) return
+    setTransferring(true)
+    await transferAdmin(householdId, user.uid, transferTo)
     await leaveHousehold(user.uid, householdId)
-    setHouseholdId('')
+    setTransferOpen(false)
+    setHouseholdId(null)
     navigate('/')
   }
 
@@ -163,22 +216,62 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      {/* danger zone */}
-      <Card className="border-destructive/30">
+      {/* account */}
+      <Card className="border-border">
         <CardHeader className="pb-3 pt-4">
           <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 pb-4">
-          {!isAdmin && (
-            <Button variant="outline" className="w-full text-destructive border-destructive/30 hover:bg-destructive/5" onClick={handleLeave}>
-              Leave household
-            </Button>
-          )}
-          <Button variant="outline" className="w-full gap-2" onClick={handleSignOut}>
+          <Button
+            variant="outline"
+            className="w-full gap-2 justify-start"
+            onClick={handleSwitch}
+          >
+            <RefreshCw size={14} />
+            Switch / leave household
+          </Button>
+          <Button variant="outline" className="w-full gap-2 justify-start" onClick={handleSignOut}>
             <LogOut size={14} /> Sign out
           </Button>
         </CardContent>
       </Card>
+
+      {/* transfer admin dialog */}
+      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Transfer admin role</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              You're the admin. Pick a new admin before leaving — they'll manage the household.
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">New admin</Label>
+              <Select value={transferTo} onValueChange={(v) => setTransferTo(v ?? '')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {otherMembers.map((m) => (
+                    <SelectItem key={m.uid} value={m.uid}>{m.displayName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={!transferTo || transferring}
+              onClick={handleTransferAndLeave}
+            >
+              {transferring ? 'Leaving…' : 'Transfer & leave'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

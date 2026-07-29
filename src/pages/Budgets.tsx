@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useStore } from '@/store/useStore'
+import { useData } from '@/hooks/useData'
 import { useHousehold } from '@/hooks/useHousehold'
-import { listenBudgets, listenTransactions, addBudget, updateBudget, deleteBudget } from '@/lib/firestore'
+import { addBudget, updateBudget, deleteBudget } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,24 +22,16 @@ import {
 } from '@/components/ui/dialog'
 import { Card, CardContent } from '@/components/ui/card'
 import { EXPENSE_CATEGORIES } from '@/lib/constants'
-import { formatCurrency, currentMonth } from '@/lib/utils'
-import type { Budget, Transaction } from '@/types'
+import { formatCurrency } from '@/lib/utils'
+import type { Budget } from '@/types'
 
 export function Budgets() {
   const { selectedMonth } = useStore()
   const { householdId } = useHousehold()
-  const [budgets, setBudgets] = useState<Budget[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const { transactions, budgets } = useData()
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
-  const [form, setForm] = useState({ category: '', monthlyLimit: '', month: currentMonth() })
-
-  useEffect(() => {
-    if (!householdId) return
-    const unsub1 = listenBudgets(householdId, selectedMonth, setBudgets)
-    const unsub2 = listenTransactions(householdId, selectedMonth, setTransactions)
-    return () => { unsub1(); unsub2() }
-  }, [householdId, selectedMonth])
+  const [form, setForm] = useState({ category: '', monthlyLimit: '', month: selectedMonth })
 
   const spentMap = useMemo(() => {
     const map: Record<string, number> = {}

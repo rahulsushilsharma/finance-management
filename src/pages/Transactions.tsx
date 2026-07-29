@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { format } from 'date-fns'
 import { useStore } from '@/store/useStore'
+import { useData } from '@/hooks/useData'
 import { useHousehold } from '@/hooks/useHousehold'
-import { listenTransactions, deleteTransaction } from '@/lib/firestore'
+import { deleteTransaction } from '@/lib/firestore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,19 +14,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
-import type { Transaction } from '@/types'
 
 export function Transactions() {
   const { selectedMonth, setSelectedMonth } = useStore()
+  const { transactions } = useData()
   const { householdId } = useHousehold()
-  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [filterType, setFilterType] = useState('all')
   const [search, setSearch] = useState('')
-
-  useEffect(() => {
-    if (!householdId) return
-    return listenTransactions(householdId, selectedMonth, setTransactions)
-  }, [householdId, selectedMonth])
 
   const filtered = transactions
     .filter((t) => filterType === 'all' || t.type === filterType)
@@ -82,9 +77,7 @@ export function Transactions() {
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-xs text-muted-foreground">{t.category}</span>
                     <span className="text-xs text-muted-foreground">·</span>
-                    <span className="text-xs text-muted-foreground">
-                      {format(new Date(t.date), 'MMM d')}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{format(new Date(t.date), 'MMM d')}</span>
                   </div>
                 </div>
               </div>

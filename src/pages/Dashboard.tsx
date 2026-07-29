@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { format, addMonths, subMonths, parseISO } from 'date-fns'
 import { useStore } from '@/store/useStore'
-import { useHousehold } from '@/hooks/useHousehold'
-import { listenTransactions } from '@/lib/firestore'
+import { useData } from '@/hooks/useData'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, currentMonth } from '@/lib/utils'
-import type { Transaction } from '@/types'
 
 function toMonthDate(month: string) {
   return parseISO(month + '-01')
@@ -14,15 +12,9 @@ function toMonthDate(month: string) {
 
 export function Dashboard() {
   const { selectedMonth, setSelectedMonth } = useStore()
-  const { householdId } = useHousehold()
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const { transactions } = useData()
 
   const isCurrentMonth = selectedMonth === currentMonth()
-
-  useEffect(() => {
-    if (!householdId) return
-    return listenTransactions(householdId, selectedMonth, setTransactions)
-  }, [householdId, selectedMonth])
 
   const { income, expenses } = useMemo(() => {
     const income = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
@@ -38,16 +30,12 @@ export function Dashboard() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      {/* month navigator */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={prev}>‹</Button>
         <div className="text-center">
           <p className="font-semibold text-sm">{format(toMonthDate(selectedMonth), 'MMMM yyyy')}</p>
           {!isCurrentMonth && (
-            <button
-              onClick={() => setSelectedMonth(currentMonth())}
-              className="text-xs text-primary underline underline-offset-2"
-            >
+            <button onClick={() => setSelectedMonth(currentMonth())} className="text-xs text-primary underline underline-offset-2">
               Back to today
             </button>
           )}
@@ -55,7 +43,6 @@ export function Dashboard() {
         <Button variant="ghost" size="sm" onClick={next} disabled={isCurrentMonth}>›</Button>
       </div>
 
-      {/* balance hero */}
       <Card className="bg-primary text-primary-foreground border-0">
         <CardContent className="pt-5 pb-5 text-center">
           <p className="text-sm opacity-70 mb-1">Balance</p>

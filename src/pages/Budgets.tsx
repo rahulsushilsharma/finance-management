@@ -101,8 +101,15 @@ export function Budgets() {
       setCopying(false)
       return
     }
-    await Promise.all(prev.map((b) => addBudget(householdId, { category: b.category, monthlyLimit: b.monthlyLimit, month: selectedMonth })))
-    toast.success(`Copied ${prev.length} budget${prev.length > 1 ? 's' : ''} from ${format(toMonthDate(lastMonth), 'MMMM')}`)
+    const existingCategories = new Set(budgets.map((b) => b.category))
+    const toAdd = prev.filter((b) => !existingCategories.has(b.category))
+    if (toAdd.length === 0) {
+      toast.error('All budgets already exist for this month')
+      setCopying(false)
+      return
+    }
+    await Promise.all(toAdd.map((b) => addBudget(householdId, { category: b.category, monthlyLimit: b.monthlyLimit, month: selectedMonth })))
+    toast.success(`Copied ${toAdd.length} budget${toAdd.length > 1 ? 's' : ''} from ${format(toMonthDate(lastMonth), 'MMMM')}`)
     setCopying(false)
   }
 

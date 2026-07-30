@@ -42,6 +42,31 @@ export function listenTransactions(
   )
 }
 
+export async function getTransactionsForMonth(hid: string, month: string): Promise<Transaction[]> {
+  const snap = await getDocs(query(txCol(hid), where('date', '>=', `${month}-01`), where('date', '<=', `${month}-31`)))
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Transaction)
+}
+
+export async function addTransfer(
+  hid: string,
+  fromAccountId: string,
+  fromAccountType: AccountType,
+  toAccountId: string,
+  toAccountType: AccountType,
+  amount: number,
+  date: string,
+  description: string,
+  addedBy?: string
+): Promise<void> {
+  const batch = writeBatch(db)
+  const base = { amount, category: 'Transfer', description, date, ...(addedBy ? { addedBy } : {}) }
+  batch.set(doc(txCol(hid)), { ...base, type: 'expense', accountId: fromAccountId })
+  batch.set(doc(txCol(hid)), { ...base, type: 'income', accountId: toAccountId })
+  batch.update(doc(accountCol(hid), fromAccountId), { balance: increment(balanceDelta('expense', amount, fromAccountType)) })
+  batch.update(doc(accountCol(hid), toAccountId), { balance: increment(balanceDelta('income', amount, toAccountType)) })
+  await batch.commit()
+}
+
 export async function addTransaction(
   hid: string,
   t: Omit<Transaction, 'id'>,
@@ -225,3 +250,28 @@ export async function joinHousehold(uid: string, householdId: string, displayNam
   })
   return true
 }
+
+// Recurring transactions
+export interface RecurringTransaction {
+  id: string
+  type: 'income' | 'expense'
+  amount: number
+  category: string
+  description: string
+  accountId?: string
+  addedBy?: string
+  dayOfMonth: number
+  active: boolean
+}
+
+const recurringCol = (hid: string) => collection(db, 'households', hid, 'recurring')
+
+export function listenRecurring(hid: string, cb: (items: RecurringTransaction[]) => void): Unsubscribe {
+  return onSnapshot(recurringCol(hid), (snap) =>
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as RecurringTransaction))
+  )
+}
+
+export const addRecurring = (hid: string, r: Omit<RecurringTransaction, 'id'>) => addDoc(recurringCol(hid), r)
+export const updateRecurring = (hid: string, id: string, r: Partial<Omit<RecurringTransaction, 'id'>>) => updateDoc(doc(recurringCol(hid), id), r)
+export const deleteRecurring = (hid: string, id: string) => deleteDoc(doc(recurringCol(hid), id))

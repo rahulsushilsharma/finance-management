@@ -37,7 +37,7 @@ export function Transactions() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleteTx, setDeleteTx] = useState<Transaction | null>(null)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
-  const [editForm, setEditForm] = useState({ amount: '', description: '', category: '', date: '' })
+  const [editForm, setEditForm] = useState({ amount: '', description: '', category: '', date: '', accountId: '' })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -57,19 +57,19 @@ export function Transactions() {
 
   function openEdit(t: Transaction) {
     setEditTx(t)
-    setEditForm({ amount: String(t.amount), description: t.description, category: t.category, date: t.date })
+    setEditForm({ amount: String(t.amount), description: t.description, category: t.category, date: t.date, accountId: t.accountId ?? '' })
   }
 
   async function handleEdit() {
     if (!householdId || !editTx || saving) return
     setSaving(true)
     try {
-      const account = accounts.find((a) => a.id === editTx.accountId)
+      const newAccount = accounts.find((a) => a.id === (editForm.accountId || editTx.accountId))
       await updateTransaction(
         householdId, editTx.id,
         { type: editTx.type, amount: editTx.amount, accountId: editTx.accountId },
-        { amount: parseFloat(editForm.amount), description: editForm.description, category: editForm.category, date: editForm.date },
-        account?.type
+        { amount: parseFloat(editForm.amount), description: editForm.description, category: editForm.category, date: editForm.date, accountId: editForm.accountId || undefined },
+        newAccount?.type
       )
       toast.success('Transaction updated')
       setEditTx(null)
@@ -290,6 +290,27 @@ export function Transactions() {
                 <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
               </div>
             </div>
+            {accounts.length > 0 && (
+              <div className="space-y-1">
+                <Label>Account</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {accounts.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, accountId: a.id })}
+                      className={`text-xs px-3 py-1 rounded-full border transition-all ${
+                        editForm.accountId === a.id
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted text-muted-foreground border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTx(null)} disabled={saving}>Cancel</Button>

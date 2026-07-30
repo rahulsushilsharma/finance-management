@@ -1,10 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { format, subMonths, parseISO } from 'date-fns'
 import { useStore } from '@/store/useStore'
 import { useData } from '@/hooks/useData'
+import { useHousehold } from '@/hooks/useHousehold'
+import { getTransactionsForMonth } from '@/lib/firestore'
+import type { Transaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatCurrency, currentMonth } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
@@ -20,6 +23,8 @@ function toMonthDate(m: string) { return parseISO(m + '-01') }
 export function Analytics() {
   const { selectedMonth } = useStore()
   const { transactions, members, currency, loading } = useData()
+  const { householdId } = useHousehold()
+  const [pastMonthsData, setPastMonthsData] = useState<Record<string, Transaction[]>>({})
 
   const { categoryData, totalExpense, totalIncome, topCategory } = useMemo(() => {
     const map: Record<string, number> = {}
@@ -48,18 +53,26 @@ export function Analytics() {
     return Object.entries(map).map(([name, value]) => ({ name, value }))
   }, [transactions, memberMap])
 
+  useEffect(() => {
+    if (!householdId) return
+    const months = Array.from({ length: 5 }, (_, i) =>
+      format(subMonths(toMonthDate(selectedMonth), 5 - i), 'yyyy-MM')
+    )
+    Promise.all(months.map((m) => getTransactionsForMonth(householdId, m).then((txs) => [m, txs] as const)))
+      .then((entries) => setPastMonthsData(Object.fromEntries(entries)))
+      .catch(() => {/* non-fatal: chart shows 0 for failed months */})
+  }, [householdId, selectedMonth])
+
   const trendData = useMemo(() => {
     return Array.from({ length: 6 }, (_, i) => {
       const m = format(subMonths(toMonthDate(selectedMonth), 5 - i), 'yyyy-MM')
       const label = format(toMonthDate(m), 'MMM')
-      if (m === selectedMonth) {
-        const income = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-        const expense = transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-        return { month: label, income, expense }
-      }
-      return { month: label, income: 0, expense: 0 }
+      const txs = m === selectedMonth ? transactions : (pastMonthsData[m] ?? [])
+      const income = txs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const expense = txs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      return { month: label, income, expense }
     })
-  }, [transactions, selectedMonth])
+  }, [transactions, selectedMonth, pastMonthsData])
 
   const savingsRate = totalIncome > 0 ? Math.max(0, ((totalIncome - totalExpense) / totalIncome) * 100) : null
 
@@ -106,11 +119,6 @@ export function Analytics() {
                     <p className="text-xs text-white/50">{formatCurrency(totalIncome - totalExpense, currency)} saved</p>
                   </div>
                 </>
-              )}
-              {selectedMonth !== currentMonth() && (
-                <div className="w-full mt-1">
-                  <span className="text-xs text-white/30">Trend chart shows current month only · navigate months to compare</span>
-                </div>
               )}
             </div>
           </>

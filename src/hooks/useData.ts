@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { useStore } from '@/store/useStore'
 import { useHousehold } from './useHousehold'
-import { listenTransactions, listenBudgets, listenMembers, listenHousehold, listenAccounts, type Member } from '@/lib/firestore'
+import { listenTransactions, listenBudgets, listenMembers, listenHousehold, listenAccounts, listenRecurring, addTransaction, type Member, type RecurringTransaction } from '@/lib/firestore'
 export const DEFAULT_CURRENCY = 'USD'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/constants'
 import type { Transaction, Budget, Account } from '@/types'
@@ -20,6 +20,7 @@ interface DataCtx {
   members: Member[]
   accounts: Account[]
   accountsReady: boolean
+  recurring: RecurringTransaction[]
   currency: string
   expenseCategories: string[]
   incomeCategories: string[]
@@ -32,6 +33,7 @@ const Ctx = createContext<DataCtx>({
   members: [],
   accounts: [],
   accountsReady: false,
+  recurring: [],
   currency: DEFAULT_CURRENCY,
   expenseCategories: [...EXPENSE_CATEGORIES],
   incomeCategories: [...INCOME_CATEGORIES],
@@ -46,6 +48,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<Member[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [accountsReady, setAccountsReady] = useState(false)
+  const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
   const [customCategories, setCustomCategories] = useState<{ expense: string[]; income: string[] } | null>(null)
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY)
   const [loading, setLoading] = useState(true)
@@ -62,7 +65,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setCustomCategories(data.customCategories ?? null)
       setCurrency(data.currency ?? DEFAULT_CURRENCY)
     })
-    return () => { unsubMembers(); unsubAccounts(); unsubHousehold() }
+    const unsubRecurring = listenRecurring(householdId, setRecurring)
+    return () => { unsubMembers(); unsubAccounts(); unsubHousehold(); unsubRecurring() }
   }, [householdId])
 
   useEffect(() => {
@@ -89,6 +93,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => { unsubTx(); unsubBudgets() }
   }, [householdId, selectedMonth])
 
+  useEffect(() => {
+    if (!householdId || recurring.length === 0) return
+    const now = new Date()
+    const thisMonth = now.toISOString().slice(0, 7)
+    const today = now.getDate()
+    recurring.filter((r) => r.active && today >= r.dayOfMonth).forEach((r) => {
+      const expectedDate = `${thisMonth}-${String(r.dayOfMonth).padStart(2, '0')}`
+      const alreadyExists = transactions.some(
+        (t) => t.description === r.description && t.amount === r.amount && t.date === expectedDate
+      )
+      if (!alreadyExists) {
+        addTransaction(householdId, {
+          type: r.type, amount: r.amount, category: r.category,
+          description: r.description, date: expectedDate,
+          addedBy: r.addedBy,
+          ...(r.accountId ? { accountId: r.accountId } : {}),
+        })
+      }
+    })
+  // ponytail: transactions excluded from deps to avoid infinite loop; reruns only when recurring changes
+  }, [recurring, householdId])
+
   const expenseCategories = customCategories
     ? [...new Set([...EXPENSE_CATEGORIES, ...customCategories.expense])]
     : [...EXPENSE_CATEGORIES]
@@ -99,7 +125,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   return createElement(
     Ctx.Provider,
-    { value: { transactions, budgets, members, accounts, accountsReady, currency, expenseCategories, incomeCategories, loading } },
+    { value: { transactions, budgets, members, accounts, accountsReady, recurring, currency, expenseCategories, incomeCategories, loading } },
     children
   )
 }

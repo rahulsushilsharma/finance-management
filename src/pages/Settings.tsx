@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Check, LogOut, UserMinus, Crown, User, RefreshCw, Plus, X, Pencil, Shield } from 'lucide-react'
+import { Copy, Check, LogOut, UserMinus, Crown, User, RefreshCw, Plus, X, Pencil, Shield, Share2, RepeatIcon, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useHousehold } from '@/hooks/useHousehold'
 import { useData } from '@/hooks/useData'
@@ -17,6 +17,9 @@ import {
   addAccount,
   updateAccount,
   deleteAccount,
+  addRecurring,
+  deleteRecurring,
+  updateRecurring,
   type Member,
 } from '@/lib/firestore'
 import type { Account, AccountType } from '@/types'
@@ -58,7 +61,7 @@ export function Settings() {
   const [transferTo, setTransferTo] = useState('')
   const [transferring, setTransferring] = useState(false)
 
-  const { expenseCategories, incomeCategories, accounts, currency } = useData()
+  const { expenseCategories, incomeCategories, accounts, currency, recurring } = useData()
   const [newCatType, setNewCatType] = useState<'expense' | 'income'>('expense')
   const [newCatName, setNewCatName] = useState('')
 
@@ -66,6 +69,11 @@ export function Settings() {
   const [editAccountId, setEditAccountId] = useState<string | null>(null)
   const [accountOpen, setAccountOpen] = useState(false)
   const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null)
+
+  const [recurringOpen, setRecurringOpen] = useState(false)
+  const [recurringForm, setRecurringForm] = useState<{
+    type: 'income' | 'expense'; amount: string; description: string; category: string; accountId: string; dayOfMonth: string
+  }>({ type: 'expense', amount: '', description: '', category: '', accountId: '', dayOfMonth: '1' })
 
   const me = members.find((m) => m.uid === user?.uid)
   const isAdmin = me?.role === 'admin'
@@ -118,6 +126,30 @@ export function Settings() {
     navigator.clipboard.writeText(householdId)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function handleShare() {
+    if (!householdId) return
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      navigator.share({ title: 'Join our household', text: householdId })
+    } else {
+      handleCopy()
+    }
+  }
+
+  async function handleRecurringSubmit() {
+    if (!householdId || !recurringForm.description || !recurringForm.amount || !recurringForm.category) return
+    await addRecurring(householdId, {
+      type: recurringForm.type,
+      amount: parseFloat(recurringForm.amount),
+      description: recurringForm.description,
+      category: recurringForm.category,
+      dayOfMonth: Math.min(28, Math.max(1, parseInt(recurringForm.dayOfMonth) || 1)),
+      active: true,
+      ...(recurringForm.accountId ? { accountId: recurringForm.accountId } : {}),
+    })
+    setRecurringForm({ type: 'expense', amount: '', description: '', category: '', accountId: '', dayOfMonth: '1' })
+    setRecurringOpen(false)
   }
 
   async function handleSwitch() {
@@ -293,6 +325,11 @@ export function Settings() {
               <Button variant="outline" size="sm" onClick={handleCopy} className="shrink-0 gap-1.5">
                 {copied ? <><Check size={13} className="text-green-500" /> Copied</> : <><Copy size={13} /> Copy</>}
               </Button>
+              {typeof navigator !== 'undefined' && 'share' in navigator && (
+                <Button variant="outline" size="sm" onClick={handleShare} className="shrink-0 gap-1.5">
+                  <Share2 size={13} /> Share
+                </Button>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-1.5">Share with family members to join your household.</p>
           </div>
@@ -414,6 +451,54 @@ export function Settings() {
         </CardContent>
       </Card>
 
+      {/* ── Recurring Transactions ── */}
+      <Card>
+        <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
+          <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <RepeatIcon size={12} /> Recurring Transactions
+          </CardTitle>
+          <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={() => setRecurringOpen(true)}>
+            <Plus size={12} /> Add
+          </Button>
+        </CardHeader>
+        <CardContent className="pb-4 space-y-2">
+          {recurring.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No recurring transactions yet.</p>
+          ) : (
+            <ul className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+              {recurring.map((r) => (
+                <li key={r.id} className="flex items-center justify-between px-4 py-3 gap-3 bg-card">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={r.active}
+                      onChange={(e) => householdId && updateRecurring(householdId, r.id, { active: e.target.checked })}
+                      className="shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{r.description}</p>
+                      <p className="text-xs text-muted-foreground">{r.category} · Day {r.dayOfMonth}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={cn('text-sm font-semibold', r.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground')}>
+                      {r.type === 'income' ? '+' : '−'}{formatCurrency(r.amount, currency)}
+                    </span>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => householdId && deleteRecurring(householdId, r.id)}
+                    >
+                      <Trash2 size={13} />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Danger zone ── */}
       <Card className="border-border">
         <CardHeader className="pb-3 pt-4">
@@ -511,6 +596,75 @@ export function Settings() {
         onConfirm={handleSignOut}
         onCancel={() => setSignOutOpen(false)}
       />
+
+      <Dialog open={recurringOpen} onOpenChange={setRecurringOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Recurring Transaction</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label>Type</Label>
+              <Select value={recurringForm.type} onValueChange={(v) => setRecurringForm({ ...recurringForm, type: (v ?? 'expense') as 'income' | 'expense', category: '' })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Description</Label>
+              <Input placeholder="Netflix, Rent, Salary…" value={recurringForm.description} onChange={(e) => setRecurringForm({ ...recurringForm, description: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Amount</Label>
+              <Input type="number" min="0" step="0.01" placeholder="0.00" value={recurringForm.amount} onChange={(e) => setRecurringForm({ ...recurringForm, amount: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Category</Label>
+              <Select value={recurringForm.category} onValueChange={(v) => setRecurringForm({ ...recurringForm, category: v ?? '' })}>
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {(recurringForm.type === 'expense' ? expenseCategories : incomeCategories).map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Account (optional)</Label>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setRecurringForm({ ...recurringForm, accountId: '' })}
+                  className={cn('text-xs px-2.5 py-1 rounded-full border transition-colors', recurringForm.accountId === '' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground')}
+                >
+                  None
+                </button>
+                {accounts.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => setRecurringForm({ ...recurringForm, accountId: a.id })}
+                    className={cn('text-xs px-2.5 py-1 rounded-full border transition-colors', recurringForm.accountId === a.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground')}
+                  >
+                    {a.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Day of month (1–28)</Label>
+              <Input type="number" min="1" max="28" value={recurringForm.dayOfMonth} onChange={(e) => setRecurringForm({ ...recurringForm, dayOfMonth: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecurringOpen(false)}>Cancel</Button>
+            <Button onClick={handleRecurringSubmit} disabled={!recurringForm.description || !recurringForm.amount || !recurringForm.category}>Add</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

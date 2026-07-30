@@ -27,12 +27,12 @@ import type { TransactionType } from '@/types'
 
 export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { householdId } = useHousehold()
-  const { expenseCategories, incomeCategories } = useData()
+  const { expenseCategories, incomeCategories, accounts } = useData()
   const { user } = useAuth()
   const { selectedMonth } = useStore()
   const today = new Date().toISOString().slice(0, 10)
   const defaultDate = selectedMonth === currentMonth() ? today : selectedMonth + '-01'
-  const empty = { amount: '', description: '', category: '', date: defaultDate }
+  const empty = { amount: '', description: '', category: '', date: defaultDate, accountId: '' }
   const [type, setType] = useState<TransactionType | null>(null)
   const [form, setForm] = useState(empty)
 
@@ -48,6 +48,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
 
   async function handleSave() {
     if (!type || !form.amount || !householdId) return
+    const account = accounts.find((a) => a.id === form.accountId)
     await addTransaction(householdId, {
       type,
       amount: parseFloat(form.amount),
@@ -55,7 +56,8 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       description: form.description || (type === 'income' ? 'Income' : 'Expense'),
       date: form.date,
       addedBy: user?.uid,
-    })
+      ...(form.accountId ? { accountId: form.accountId } : {}),
+    }, account?.type)
     toast.success(type === 'income' ? 'Income added' : 'Expense added')
     handleClose()
   }
@@ -64,8 +66,12 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="sm:max-w-sm w-full p-0 gap-0 overflow-hidden rounded-2xl">
-        <DialogHeader className="px-5 pt-5 pb-3">
+      <DialogContent className="sm:max-w-sm w-full p-0 gap-0 sm:rounded-2xl">
+        {/* drag handle — visible on mobile only */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+        <DialogHeader className="px-5 pt-3 pb-3 sm:pt-5">
           <DialogTitle className="text-base font-semibold">
             {type == null ? 'Add transaction' : type === 'expense' ? 'Add expense' : 'Add income'}
           </DialogTitle>
@@ -146,6 +152,20 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
                 />
               </div>
             </div>
+
+            {accounts.length > 0 && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">
+                  Account <span className="opacity-40">optional</span>
+                </Label>
+                <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v ?? '' })}>
+                  <SelectTrigger><SelectValue placeholder="Which account?" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-1">
               <Button variant="ghost" size="sm" onClick={() => setType(null)} className="gap-1 text-muted-foreground">

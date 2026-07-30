@@ -6,6 +6,11 @@ Last reviewed: 2026-07-30
 
 ## Missing Features
 
+### SMS Auto-import (Backlog)
+- [ ] **Companion Android app** — native app with READ_SMS permission that runs as a background service, parses bank SMS on-device, writes directly to Firestore via Firebase Android SDK. No third-party apps, no data leaves the device except the Firestore write. iOS not feasible (Apple blocks SMS access for all third-party apps). Requires: separate Android codebase, Play Store deployment, BroadcastReceiver + Firebase SDK (~150 lines Kotlin).
+
+
+
 ### Finance Core
 - [ ] Edit transaction (delete-only right now)
 - [ ] Recurring transactions (rent, salary — repeat monthly automatically)

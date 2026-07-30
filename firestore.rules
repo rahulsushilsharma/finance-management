@@ -20,6 +20,10 @@ service cloud.firestore {
         allow read, write: if isMember(hid);
       }
 
+      match /accounts/{aid} {
+        allow read, write: if isMember(hid);
+      }
+
       match /members/{uid} {
         // any member can read the members list
         allow read: if isMember(hid);

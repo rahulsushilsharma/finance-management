@@ -4,7 +4,12 @@
       "Bash(bun add *)",
       "Bash(bunx shadcn@latest init -d)",
       "Bash(bunx shadcn@latest *)",
-      "Bash(bun run *)"
+      "Bash(bun run *)",
+      "Bash(cat src/types/index.ts)",
+      "Bash(cat src/types.ts)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

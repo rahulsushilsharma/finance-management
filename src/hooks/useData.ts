@@ -9,14 +9,17 @@ import {
 } from 'react'
 import { useStore } from '@/store/useStore'
 import { useHousehold } from './useHousehold'
-import { listenTransactions, listenBudgets, listenMembers, listenHousehold, type Member } from '@/lib/firestore'
+import { listenTransactions, listenBudgets, listenMembers, listenHousehold, listenAccounts, type Member } from '@/lib/firestore'
+export const DEFAULT_CURRENCY = 'USD'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/constants'
-import type { Transaction, Budget } from '@/types'
+import type { Transaction, Budget, Account } from '@/types'
 
 interface DataCtx {
   transactions: Transaction[]
   budgets: Budget[]
   members: Member[]
+  accounts: Account[]
+  currency: string
   expenseCategories: string[]
   incomeCategories: string[]
   loading: boolean
@@ -26,6 +29,8 @@ const Ctx = createContext<DataCtx>({
   transactions: [],
   budgets: [],
   members: [],
+  accounts: [],
+  currency: DEFAULT_CURRENCY,
   expenseCategories: [...EXPENSE_CATEGORIES],
   incomeCategories: [...INCOME_CATEGORIES],
   loading: true,
@@ -37,7 +42,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [members, setMembers] = useState<Member[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
   const [customCategories, setCustomCategories] = useState<{ expense: string[]; income: string[] } | null>(null)
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY)
   const [loading, setLoading] = useState(true)
 
   const txCache = useRef<Map<string, Transaction[]>>(new Map())
@@ -46,10 +53,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!householdId) return
     const unsubMembers = listenMembers(householdId, setMembers)
+    const unsubAccounts = listenAccounts(householdId, setAccounts)
     const unsubHousehold = listenHousehold(householdId, (data) => {
       setCustomCategories(data.customCategories ?? null)
+      setCurrency(data.currency ?? DEFAULT_CURRENCY)
     })
-    return () => { unsubMembers(); unsubHousehold() }
+    return () => { unsubMembers(); unsubAccounts(); unsubHousehold() }
   }, [householdId])
 
   useEffect(() => {
@@ -86,7 +95,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   return createElement(
     Ctx.Provider,
-    { value: { transactions, budgets, members, expenseCategories, incomeCategories, loading } },
+    { value: { transactions, budgets, members, accounts, currency, expenseCategories, incomeCategories, loading } },
     children
   )
 }

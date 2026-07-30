@@ -1,5 +1,4 @@
 export type TransactionType = 'income' | 'expense'
-export type AccountLabel = 'cash' | 'bank' | 'card'
 
 export interface Transaction {
   id: string
@@ -8,7 +7,7 @@ export interface Transaction {
   category: string
   description: string
   date: string
-  accountLabel?: AccountLabel
+  accountId?: string
   addedBy?: string
 }
 
@@ -17,4 +16,13 @@ export interface Budget {
   category: string
   monthlyLimit: number
   month: string // 'YYYY-MM'
+}
+
+export type AccountType = 'bank' | 'cash' | 'credit' | 'investment' | 'asset'
+
+export interface Account {
+  id: string
+  name: string
+  type: AccountType
+  balance: number
 }

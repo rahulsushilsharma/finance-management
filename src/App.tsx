@@ -26,10 +26,10 @@ const PAGE_TITLES: Record<string, string> = {
 
 function AppShell() {
   const { pathname } = useLocation()
-  const { accounts, loading } = useData()
+  const { accounts, accountsReady } = useData()
   const [addOpen, setAddOpen] = useState(false)
 
-  if (loading) return null
+  if (!accountsReady) return null
   if (accounts.length === 0) return <AccountSetup />
 
   return (

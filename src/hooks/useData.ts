@@ -19,6 +19,7 @@ interface DataCtx {
   budgets: Budget[]
   members: Member[]
   accounts: Account[]
+  accountsReady: boolean
   currency: string
   expenseCategories: string[]
   incomeCategories: string[]
@@ -30,6 +31,7 @@ const Ctx = createContext<DataCtx>({
   budgets: [],
   members: [],
   accounts: [],
+  accountsReady: false,
   currency: DEFAULT_CURRENCY,
   expenseCategories: [...EXPENSE_CATEGORIES],
   incomeCategories: [...INCOME_CATEGORIES],
@@ -43,6 +45,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [members, setMembers] = useState<Member[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [accountsReady, setAccountsReady] = useState(false)
   const [customCategories, setCustomCategories] = useState<{ expense: string[]; income: string[] } | null>(null)
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY)
   const [loading, setLoading] = useState(true)
@@ -52,8 +55,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!householdId) return
+    setAccountsReady(false)
     const unsubMembers = listenMembers(householdId, setMembers)
-    const unsubAccounts = listenAccounts(householdId, setAccounts)
+    const unsubAccounts = listenAccounts(householdId, (a) => { setAccounts(a); setAccountsReady(true) })
     const unsubHousehold = listenHousehold(householdId, (data) => {
       setCustomCategories(data.customCategories ?? null)
       setCurrency(data.currency ?? DEFAULT_CURRENCY)
@@ -95,7 +99,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   return createElement(
     Ctx.Provider,
-    { value: { transactions, budgets, members, accounts, currency, expenseCategories, incomeCategories, loading } },
+    { value: { transactions, budgets, members, accounts, accountsReady, currency, expenseCategories, incomeCategories, loading } },
     children
   )
 }

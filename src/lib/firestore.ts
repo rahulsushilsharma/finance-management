@@ -9,6 +9,7 @@ import {
   onSnapshot,
   setDoc,
   getDoc,
+  getDocs,
   deleteField,
   type Unsubscribe,
 } from 'firebase/firestore'
@@ -63,6 +64,11 @@ export const updateBudget = (hid: string, id: string, b: Partial<Omit<Budget, 'i
 export const deleteBudget = (hid: string, id: string) =>
   deleteDoc(doc(budgetCol(hid), id))
 
+export async function getBudgetsForMonth(hid: string, month: string): Promise<Budget[]> {
+  const snap = await getDocs(query(budgetCol(hid), where('month', '==', month)))
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Budget)
+}
+
 // Members
 export interface Member {
   uid: string
@@ -99,6 +105,21 @@ export async function deleteHousehold(uid: string, hid: string): Promise<void> {
   await deleteDoc(doc(memberCol(hid), uid))
   await deleteDoc(doc(db, 'households', hid))
   await updateDoc(doc(db, 'users', uid), { householdId: deleteField() })
+}
+
+// Custom categories
+export async function updateCustomCategories(
+  hid: string,
+  categories: { expense: string[]; income: string[] }
+): Promise<void> {
+  await updateDoc(doc(db, 'households', hid), { customCategories: categories })
+}
+
+export function listenHousehold(
+  hid: string,
+  cb: (data: { customCategories?: { expense: string[]; income: string[] } }) => void
+): Unsubscribe {
+  return onSnapshot(doc(db, 'households', hid), (snap) => cb(snap.data() ?? {}))
 }
 
 // Household / user profile

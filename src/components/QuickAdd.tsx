@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { TrendingDown, TrendingUp, ChevronLeft } from 'lucide-react'
+import { toast } from 'sonner'
 import { useHousehold } from '@/hooks/useHousehold'
+import { useData } from '@/hooks/useData'
+import { useAuth } from '@/hooks/useAuth'
 import { addTransaction } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,24 +21,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/constants'
+import { currentMonth } from '@/lib/utils'
+import { useStore } from '@/store/useStore'
 import type { TransactionType } from '@/types'
-
-const EMPTY = {
-  amount: '',
-  description: '',
-  category: '',
-  date: new Date().toISOString().slice(0, 10),
-}
 
 export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { householdId } = useHousehold()
+  const { expenseCategories, incomeCategories } = useData()
+  const { user } = useAuth()
+  const { selectedMonth } = useStore()
+  const today = new Date().toISOString().slice(0, 10)
+  const defaultDate = selectedMonth === currentMonth() ? today : selectedMonth + '-01'
+  const empty = { amount: '', description: '', category: '', date: defaultDate }
   const [type, setType] = useState<TransactionType | null>(null)
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(empty)
 
   function reset() {
     setType(null)
-    setForm(EMPTY)
+    setForm(empty)
   }
 
   function handleClose() {
@@ -51,11 +54,13 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       category: form.category || 'Other',
       description: form.description || (type === 'income' ? 'Income' : 'Expense'),
       date: form.date,
+      addedBy: user?.uid,
     })
+    toast.success(type === 'income' ? 'Income added' : 'Expense added')
     handleClose()
   }
 
-  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  const categories = type === 'income' ? incomeCategories : expenseCategories
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>

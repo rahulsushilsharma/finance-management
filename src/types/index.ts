@@ -9,6 +9,7 @@ export interface Transaction {
   description: string
   date: string
   accountLabel?: AccountLabel
+  addedBy?: string
 }
 
 export interface Budget {

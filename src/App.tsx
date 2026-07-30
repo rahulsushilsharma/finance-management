@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createBrowserRouter, RouterProvider, Outlet, useLocation, Navigate } from 'react-router-dom'
+import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
 import { useHousehold } from '@/hooks/useHousehold'
 import { DataProvider } from '@/hooks/useData'
@@ -13,6 +14,7 @@ import { Dashboard } from '@/pages/Dashboard'
 import { Transactions } from '@/pages/Transactions'
 import { Budgets } from '@/pages/Budgets'
 import { Settings } from '@/pages/Settings'
+import { Analytics } from '@/pages/Analytics'
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
@@ -79,6 +81,7 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: 'transactions', element: <Transactions /> },
       { path: 'budgets', element: <Budgets /> },
+      { path: 'analytics', element: <Analytics /> },
       { path: 'settings', element: <Settings /> },
     ],
   },
@@ -88,6 +91,7 @@ export default function App() {
   return (
     <AuthProvider>
       <RouterProvider router={router} />
+      <Toaster position="top-center" richColors />
     </AuthProvider>
   )
 }

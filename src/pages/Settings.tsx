@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Check, LogOut, UserMinus, Crown, User, RefreshCw } from 'lucide-react'
+import { Copy, Check, LogOut, UserMinus, Crown, User, RefreshCw, Plus, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useHousehold } from '@/hooks/useHousehold'
+import { useData } from '@/hooks/useData'
 import { signOut } from '@/lib/auth'
 import {
   listenMembers,
@@ -11,6 +12,7 @@ import {
   deleteHousehold,
   transferAdmin,
   updateDisplayName,
+  updateCustomCategories,
   type Member,
 } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
@@ -31,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 
 export function Settings() {
@@ -44,9 +47,14 @@ export function Settings() {
   const [copied, setCopied] = useState(false)
 
   // transfer admin dialog
+  const [signOutOpen, setSignOutOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
   const [transferTo, setTransferTo] = useState('')
   const [transferring, setTransferring] = useState(false)
+
+  const { expenseCategories, incomeCategories } = useData()
+  const [newCatType, setNewCatType] = useState<'expense' | 'income'>('expense')
+  const [newCatName, setNewCatName] = useState('')
 
   const me = members.find((m) => m.uid === user?.uid)
   const isAdmin = me?.role === 'admin'
@@ -111,6 +119,30 @@ export function Settings() {
   async function handleSignOut() {
     await signOut()
     navigate('/login')
+  }
+
+  async function handleAddCategory() {
+    if (!householdId || !newCatName.trim()) return
+    const name = newCatName.trim()
+    const customExpense = expenseCategories.filter((c) => !['Food','Transport','Housing','Health','Entertainment','Education','Shopping','Other'].includes(c))
+    const customIncome = incomeCategories.filter((c) => !['Salary','Freelance','Investment','Gift','Other'].includes(c))
+    if (newCatType === 'expense') {
+      await updateCustomCategories(householdId, { expense: [...customExpense, name], income: customIncome })
+    } else {
+      await updateCustomCategories(householdId, { expense: customExpense, income: [...customIncome, name] })
+    }
+    setNewCatName('')
+  }
+
+  async function handleRemoveCategory(name: string, type: 'expense' | 'income') {
+    if (!householdId) return
+    const customExpense = expenseCategories.filter((c) => !['Food','Transport','Housing','Health','Entertainment','Education','Shopping','Other'].includes(c))
+    const customIncome = incomeCategories.filter((c) => !['Salary','Freelance','Investment','Gift','Other'].includes(c))
+    if (type === 'expense') {
+      await updateCustomCategories(householdId, { expense: customExpense.filter((c) => c !== name), income: customIncome })
+    } else {
+      await updateCustomCategories(householdId, { expense: customExpense, income: customIncome.filter((c) => c !== name) })
+    }
   }
 
   return (
@@ -216,6 +248,58 @@ export function Settings() {
         </CardContent>
       </Card>
 
+      {/* custom categories */}
+      <Card>
+        <CardHeader className="pb-3 pt-4">
+          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Custom Categories</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 pb-4">
+          <div className="flex gap-2">
+            <Select value={newCatType} onValueChange={(v) => setNewCatType((v ?? 'expense') as 'expense' | 'income')}>
+              <SelectTrigger className="w-28 shrink-0"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="expense">Expense</SelectItem>
+                <SelectItem value="income">Income</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Category name"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+            />
+            <Button size="icon" variant="outline" onClick={handleAddCategory} disabled={!newCatName.trim()}>
+              <Plus size={15} />
+            </Button>
+          </div>
+          {(() => {
+            const defaultExpense = ['Food','Transport','Housing','Health','Entertainment','Education','Shopping','Other']
+            const defaultIncome = ['Salary','Freelance','Investment','Gift','Other']
+            const customExpense = expenseCategories.filter((c) => !defaultExpense.includes(c))
+            const customIncome = incomeCategories.filter((c) => !defaultIncome.includes(c))
+            if (customExpense.length === 0 && customIncome.length === 0) {
+              return <p className="text-xs text-muted-foreground">No custom categories yet.</p>
+            }
+            return (
+              <div className="space-y-2">
+                {customExpense.map((c) => (
+                  <div key={c} className="flex items-center justify-between text-sm">
+                    <span>{c} <span className="text-xs text-muted-foreground">expense</span></span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveCategory(c, 'expense')}><X size={12} /></Button>
+                  </div>
+                ))}
+                {customIncome.map((c) => (
+                  <div key={c} className="flex items-center justify-between text-sm">
+                    <span>{c} <span className="text-xs text-muted-foreground">income</span></span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveCategory(c, 'income')}><X size={12} /></Button>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </CardContent>
+      </Card>
+
       {/* account */}
       <Card className="border-border">
         <CardHeader className="pb-3 pt-4">
@@ -230,7 +314,7 @@ export function Settings() {
             <RefreshCw size={14} />
             Switch / leave household
           </Button>
-          <Button variant="outline" className="w-full gap-2 justify-start" onClick={handleSignOut}>
+          <Button variant="outline" className="w-full gap-2 justify-start" onClick={() => setSignOutOpen(true)}>
             <LogOut size={14} /> Sign out
           </Button>
         </CardContent>
@@ -272,6 +356,15 @@ export function Settings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={signOutOpen}
+        title="Sign out?"
+        description="You'll need to sign in again to access your data."
+        confirmLabel="Sign out"
+        onConfirm={handleSignOut}
+        onCancel={() => setSignOutOpen(false)}
+      />
     </div>
   )
 }

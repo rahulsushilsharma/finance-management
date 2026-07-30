@@ -5,6 +5,7 @@ import { useStore } from '@/store/useStore'
 import { useData } from '@/hooks/useData'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, currentMonth, cn } from '@/lib/utils'
 
 function toMonthDate(month: string) {
@@ -13,7 +14,7 @@ function toMonthDate(month: string) {
 
 export function Dashboard() {
   const { selectedMonth, setSelectedMonth } = useStore()
-  const { transactions } = useData()
+  const { transactions, loading } = useData()
 
   const isCurrentMonth = selectedMonth === currentMonth()
 
@@ -31,7 +32,7 @@ export function Dashboard() {
   function next() { setSelectedMonth(format(addMonths(toMonthDate(selectedMonth), 1), 'yyyy-MM')) }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4 max-w-2xl mx-auto pb-32">
       {/* month navigator */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={prev} className="h-8 w-8">
@@ -101,7 +102,21 @@ export function Dashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pb-2 px-0">
-          {sorted.length === 0 ? (
+          {loading ? (
+            <div className="space-y-1 px-4 py-2">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 py-2">
+                  <Skeleton className="w-9 h-9 rounded-full shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-2/3" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              ))}
+            </div>
+          ) : sorted.length === 0 ? (
+
             <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
               <Wallet size={32} strokeWidth={1.25} />
               <p className="text-sm">{isCurrentMonth ? 'No transactions yet' : 'No transactions this month'}</p>

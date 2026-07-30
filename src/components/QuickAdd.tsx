@@ -32,13 +32,14 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
   const { selectedMonth } = useStore()
   const today = new Date().toISOString().slice(0, 10)
   const defaultDate = selectedMonth === currentMonth() ? today : selectedMonth + '-01'
-  const empty = { amount: '', description: '', category: '', date: defaultDate, accountId: '' }
+  const defaultAccountId = accounts[0]?.id ?? ''
+  const empty = { amount: '', description: '', category: '', date: defaultDate, accountId: defaultAccountId }
   const [type, setType] = useState<TransactionType | null>(null)
   const [form, setForm] = useState(empty)
 
   function reset() {
     setType(null)
-    setForm(empty)
+    setForm({ ...empty, accountId: accounts[0]?.id ?? '' })
   }
 
   function handleClose() {
@@ -100,22 +101,37 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
           </div>
         ) : (
           <div className="px-5 pb-5 space-y-4">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Amount *</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  autoFocus
-                  placeholder="0.00"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  className="text-2xl font-bold h-14 text-center pl-6 tracking-tight"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground block">Amount *</Label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                autoFocus
+                placeholder="0.00"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                className="text-2xl font-bold h-14 text-center tracking-tight"
+              />
+              {accounts.length > 0 && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {accounts.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, accountId: a.id }))}
+                      className={`text-xs px-3 py-1 rounded-full border transition-all ${
+                        form.accountId === a.id
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted text-muted-foreground border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
@@ -153,21 +169,8 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
               </div>
             </div>
 
-            {accounts.length > 0 && (
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1.5 block">
-                  Account <span className="opacity-40">optional</span>
-                </Label>
-                <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v ?? '' })}>
-                  <SelectTrigger><SelectValue placeholder="Which account?" /></SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
-            <div className="flex gap-2 pt-1">
+<div className="flex gap-2 pt-1">
               <Button variant="ghost" size="sm" onClick={() => setType(null)} className="gap-1 text-muted-foreground">
                 <ChevronLeft size={14} /> Back
               </Button>

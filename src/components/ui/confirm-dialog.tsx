@@ -13,6 +13,7 @@ interface Props {
   description?: string
   confirmLabel?: string
   variant?: 'destructive' | 'default'
+  loading?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   description,
   confirmLabel = 'Confirm',
   variant = 'destructive',
+  loading = false,
   onConfirm,
   onCancel,
 }: Props) {
@@ -34,8 +36,10 @@ export function ConfirmDialog({
         </DialogHeader>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={onCancel}>Cancel</Button>
-          <Button variant={variant} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button variant="outline" onClick={onCancel} disabled={loading}>Cancel</Button>
+          <Button variant={variant} onClick={onConfirm} disabled={loading}>
+            {loading ? 'Please wait…' : confirmLabel}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

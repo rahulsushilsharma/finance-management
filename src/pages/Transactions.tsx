@@ -38,6 +38,8 @@ export function Transactions() {
   const [deleteTx, setDeleteTx] = useState<Transaction | null>(null)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const [editForm, setEditForm] = useState({ amount: '', description: '', category: '', date: '' })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const { income, expenses, filtered } = useMemo(() => {
     const income = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
@@ -59,16 +61,21 @@ export function Transactions() {
   }
 
   async function handleEdit() {
-    if (!householdId || !editTx) return
-    const account = accounts.find((a) => a.id === editTx.accountId)
-    await updateTransaction(
-      householdId, editTx.id,
-      { type: editTx.type, amount: editTx.amount, accountId: editTx.accountId },
-      { amount: parseFloat(editForm.amount), description: editForm.description, category: editForm.category, date: editForm.date },
-      account?.type
-    )
-    toast.success('Transaction updated')
-    setEditTx(null)
+    if (!householdId || !editTx || saving) return
+    setSaving(true)
+    try {
+      const account = accounts.find((a) => a.id === editTx.accountId)
+      await updateTransaction(
+        householdId, editTx.id,
+        { type: editTx.type, amount: editTx.amount, accountId: editTx.accountId },
+        { amount: parseFloat(editForm.amount), description: editForm.description, category: editForm.category, date: editForm.date },
+        account?.type
+      )
+      toast.success('Transaction updated')
+      setEditTx(null)
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleExportCSV() {
@@ -84,12 +91,17 @@ export function Transactions() {
   }
 
   async function handleDelete() {
-    if (!householdId || !deleteId || !deleteTx) return
-    const account = accounts.find((a) => a.id === deleteTx.accountId)
-    await deleteTransaction(householdId, deleteId, deleteTx, account?.type)
-    toast.success('Transaction deleted')
-    setDeleteId(null)
-    setDeleteTx(null)
+    if (!householdId || !deleteId || !deleteTx || deleting) return
+    setDeleting(true)
+    try {
+      const account = accounts.find((a) => a.id === deleteTx.accountId)
+      await deleteTransaction(householdId, deleteId, deleteTx, account?.type)
+      toast.success('Transaction deleted')
+      setDeleteId(null)
+      setDeleteTx(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const editCategories = editTx?.type === 'income' ? incomeCategories : expenseCategories
@@ -280,8 +292,8 @@ export function Transactions() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditTx(null)}>Cancel</Button>
-            <Button onClick={handleEdit} disabled={!editForm.amount}>Save changes</Button>
+            <Button variant="outline" onClick={() => setEditTx(null)} disabled={saving}>Cancel</Button>
+            <Button onClick={handleEdit} disabled={!editForm.amount || saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -291,6 +303,7 @@ export function Transactions() {
         title="Delete transaction?"
         description="This will also revert the account balance. Can't be undone."
         confirmLabel="Delete"
+        loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => { setDeleteId(null); setDeleteTx(null) }}
       />

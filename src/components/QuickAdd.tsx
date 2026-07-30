@@ -36,10 +36,12 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
   const empty = { amount: '', description: '', category: '', date: defaultDate, accountId: defaultAccountId }
   const [type, setType] = useState<TransactionType | null>(null)
   const [form, setForm] = useState(empty)
+  const [saving, setSaving] = useState(false)
 
   function reset() {
     setType(null)
     setForm({ ...empty, accountId: accounts[0]?.id ?? '' })
+    setSaving(false)
   }
 
   function handleClose() {
@@ -48,27 +50,34 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
   }
 
   async function handleSave() {
-    if (!type || !form.amount || !householdId) return
-    const account = accounts.find((a) => a.id === form.accountId)
-    await addTransaction(householdId, {
-      type,
-      amount: parseFloat(form.amount),
-      category: form.category || 'Other',
-      description: form.description || (type === 'income' ? 'Income' : 'Expense'),
-      date: form.date,
-      addedBy: user?.uid,
-      ...(form.accountId ? { accountId: form.accountId } : {}),
-    }, account?.type)
-    toast.success(type === 'income' ? 'Income added' : 'Expense added')
-    handleClose()
+    if (!type || !form.amount || !householdId || saving) return
+    setSaving(true)
+    try {
+      const account = accounts.find((a) => a.id === form.accountId)
+      await addTransaction(householdId, {
+        type,
+        amount: parseFloat(form.amount),
+        category: form.category || 'Other',
+        description: form.description || (type === 'income' ? 'Income' : 'Expense'),
+        date: form.date,
+        addedBy: user?.uid,
+        ...(form.accountId ? { accountId: form.accountId } : {}),
+      }, account?.type)
+      toast.success(type === 'income' ? 'Income added' : 'Expense added')
+      handleClose()
+    } catch {
+      toast.error('Failed to save. Try again.')
+      setSaving(false)
+    }
   }
 
   const categories = type === 'income' ? incomeCategories : expenseCategories
+  const canSave = !!form.amount && !saving
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="sm:max-w-sm w-full p-0 gap-0 sm:rounded-2xl">
-        {/* drag handle — visible on mobile only */}
+        {/* drag handle — mobile only */}
         <div className="sm:hidden flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
@@ -100,7 +109,9 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
             </button>
           </div>
         ) : (
-          <div className="px-5 pb-5 space-y-4">
+          <div className="px-5 pb-5 space-y-3">
+
+            {/* Amount + account chips + save — all together so save is visible above keyboard */}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground block">Amount *</Label>
               <Input
@@ -120,6 +131,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
                     <button
                       key={a.id}
                       type="button"
+                      disabled={saving}
                       onClick={() => setForm((f) => ({ ...f, accountId: a.id }))}
                       className={`text-xs px-3 py-1 rounded-full border transition-all ${
                         form.accountId === a.id
@@ -132,50 +144,61 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
                   ))}
                 </div>
               )}
+              {/* Save right here — always visible even when keyboard is open */}
+              <Button
+                className="w-full"
+                disabled={!canSave}
+                onClick={handleSave}
+              >
+                {saving ? 'Saving…' : type === 'expense' ? 'Add expense' : 'Add income'}
+              </Button>
             </div>
 
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">
-                Description <span className="opacity-40">optional</span>
-              </Label>
-              <Input
-                placeholder={type === 'income' ? 'Salary, freelance...' : 'Groceries, rent...'}
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            {/* Optional fields below — scroll to access */}
+            <div className="pt-1 border-t border-border space-y-3">
               <div>
                 <Label className="text-xs text-muted-foreground mb-1.5 block">
-                  Category <span className="opacity-40">optional</span>
-                </Label>
-                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v ?? '' })}>
-                  <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1.5 block">
-                  Date <span className="opacity-40">optional</span>
+                  Description <span className="opacity-40">optional</span>
                 </Label>
                 <Input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  placeholder={type === 'income' ? 'Salary, freelance...' : 'Groceries, rent...'}
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
               </div>
-            </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">
+                    Category <span className="opacity-40">optional</span>
+                  </Label>
+                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v ?? '' })}>
+                    <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">
+                    Date <span className="opacity-40">optional</span>
+                  </Label>
+                  <Input
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  />
+                </div>
+              </div>
 
-<div className="flex gap-2 pt-1">
-              <Button variant="ghost" size="sm" onClick={() => setType(null)} className="gap-1 text-muted-foreground">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setType(null)}
+                disabled={saving}
+                className="gap-1 text-muted-foreground w-full"
+              >
                 <ChevronLeft size={14} /> Back
-              </Button>
-              <Button className="flex-1" disabled={!form.amount} onClick={handleSave}>
-                Save
               </Button>
             </div>
           </div>

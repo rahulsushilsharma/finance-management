@@ -9,7 +9,11 @@
       "Bash(cat src/types.ts)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(bun scripts/parse-statement.js scripts/test-files/hdfc-sample.txt --debug)",
+      "Bash(bun -e ' *)",
+      "Bash(bun scripts/parse-statement.js scripts/test-files/hdfc-sample.txt --json)",
+      "Bash(bun scripts/parse-statement.js scripts/test-files/hdfc-sample.txt)"
     ]
   }
 }

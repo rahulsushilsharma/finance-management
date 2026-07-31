@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
-import { getAuth } from 'firebase/auth'
+import { getFirestore, enableIndexedDbPersistence, connectFirestoreEmulator } from 'firebase/firestore'
+import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getAnalytics } from 'firebase/analytics'
 
 const firebaseConfig = {
@@ -16,8 +16,17 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig)
 export const db = getFirestore(app)
 export const auth = getAuth(app)
-export const analytics = getAnalytics(app)
+export const analytics = typeof window !== 'undefined' && import.meta.env.PROD
+  ? getAnalytics(app)
+  : null
 
-enableIndexedDbPersistence(db).catch(() => {
-  // multiple tabs open or unsupported browser — silently fall back to memory cache
-})
+// ponytail: check hostname to auto-detect emulator — no env var needed
+if (typeof window !== 'undefined' && window.location.hostname === 'localhost' && import.meta.env.VITE_USE_EMULATOR === 'true') {
+  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+  console.info('[dev] connected to Firebase emulators')
+} else {
+  enableIndexedDbPersistence(db).catch(() => {
+    // multiple tabs open or unsupported browser — silently fall back to memory cache
+  })
+}

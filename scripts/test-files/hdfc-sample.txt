@@ -1,0 +1,30 @@
+HDFC BANK Ltd.                                      Page No .:   1                                          Statement of accounts
+
+
+
+                Account Branch :JHABUA
+MR.     RAHUL SHARMA                Address :BUILDING NO. 103,WARD NO. 1,
+dfasdfasfdfdsfdsfsfdfsdfsd                GROUND & 1ST FLOOR,
+dafdfasdfdfdadfasdfasdfasf                ANANDILAL PARIKH MARG,COLLEGE ROAD,
+.                City :asdfasdffds
+Jhabua 457777                State :MADHYA PRADESH
+Madhya Pradesh INDIA                Phone no. :18002603434343230/18001600
+                Email :234243l.com
+JOINT HOLDERS :                OD Limit :0.00   Currency :INR
+                Cust ID :174798515
+Nomination  :  adfkdfhdf akdfhas adlkfha                Account No :121314334342423   OTHER
+Statement From  :  01/04/2026         To  :  30/06/2026                A/C Open Date :dhfkakldhs
+                Account Status :Regular
+                RTGS/NEFT IFSC :HDKLHLKJFD   MICR :1312312313
+
+********************************************************************************************************************************************************************************************
+Date    Narration    Chq./Ref.No.    Value Dt    Withdrawal Amt.    Deposit Amt.    Closing Balance
+********    **********************************    ************    ********    ******************    ******************    ******************
+01/04/26    POS 416021XXXXXX2566 609003979793 01APR26 08:52:23 491632574851 FP*FOOD PANDA    0000609003979793    01/04/26    388.36        610.68
+01/04/26    ACH D- INDIAN CLEARING CORP-0000NWTW7S32    0000003286319699    01/04/26    3000        -2389.32
+01/04/26    ACH D- INDIAN CLEARING CORP-0000NWTW7S32    0000003286319699    01/04/26        3000    610.68
+01/04/26    UPI-RAHUL  SHARMA-RAHU8299@OKAXIS-SBIN0001984-645756473853-UPI    0000645756473853    01/04/26        2000    2610.68
+01/04/26    POS 416021XXXXXX2566 609110951959 01APR26 15:45:25 MAKATI GRAB    0000609110951959    01/04/26    1384.03        1226.65
+01/04/26    POS 416021XXXXXX2566 609117909782 01APR26 23:29:48 491632574851 FP*FOOD PANDA    0000609117909782    01/04/26    389.91        836.74
+03/04/26    DEBIT CARD PUR ADJ DT 01/04/26    0000609110951959    03/04/26        561.61    1398.35
+04/04/26    UPI-RAHUL  SHARMA-RAHU8299@OKSBI-SBIN0001984-609476572157-UPI    0000609476572157    04/04/26        3000    4398.35

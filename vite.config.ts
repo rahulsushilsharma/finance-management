@@ -10,19 +10,27 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      devOptions: { enabled: true },
+      includeAssets: ['favicon.svg', 'icons/*.png', 'screenshots/*.png'],
       manifest: {
+        id: '/',
         name: 'FinanceApp',
         short_name: 'Finance',
         description: 'Family finance tracker',
         theme_color: '#6366f1',
-        background_color: '#ffffff',
+        background_color: '#0f172a',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
         start_url: '/',
         icons: [
-          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+        screenshots: [
+          { src: 'screenshots/mobile.png', sizes: '390x844', type: 'image/png', label: 'FinanceApp on mobile' },
+          { src: 'screenshots/desktop.png', sizes: '1280x800', type: 'image/png', form_factor: 'wide', label: 'FinanceApp on desktop' },
         ],
       },
       workbox: {

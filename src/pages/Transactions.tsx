@@ -234,14 +234,14 @@ export function Transactions() {
                   <Button
                     variant="ghost" size="icon"
                     onClick={() => openEdit(t)}
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-muted-foreground hover:text-primary transition-opacity"
                   >
                     <Pencil size={13} />
                   </Button>
                   <Button
                     variant="ghost" size="icon"
                     onClick={() => { setDeleteId(t.id); setDeleteTx(t) }}
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
                   >
                     <X size={13} />
                   </Button>

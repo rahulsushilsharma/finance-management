@@ -9,6 +9,7 @@ export interface Transaction {
   date: string
   accountId?: string
   addedBy?: string
+  transferId?: string  // set on both legs of a transfer — links them together
 }
 
 export interface Budget {

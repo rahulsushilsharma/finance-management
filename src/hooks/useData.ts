@@ -104,12 +104,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         (t) => t.description === r.description && t.amount === r.amount && t.date === expectedDate
       )
       if (!alreadyExists) {
+        const account = accounts.find((a) => a.id === r.accountId)
         addTransaction(householdId, {
           type: r.type, amount: r.amount, category: r.category,
           description: r.description, date: expectedDate,
           addedBy: r.addedBy,
           ...(r.accountId ? { accountId: r.accountId } : {}),
-        })
+        }, account?.type)
       }
     })
   // ponytail: transactions excluded from deps to avoid infinite loop; reruns only when recurring changes

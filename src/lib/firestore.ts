@@ -59,11 +59,30 @@ export async function addTransfer(
   addedBy?: string
 ): Promise<void> {
   const batch = writeBatch(db)
-  const base = { amount, category: 'Transfer', description, date, ...(addedBy ? { addedBy } : {}) }
+  const transferId = doc(txCol(hid)).id  // shared ID linking both legs
+  const base = { amount, category: 'Transfer', description, date, transferId, ...(addedBy ? { addedBy } : {}) }
   batch.set(doc(txCol(hid)), { ...base, type: 'expense', accountId: fromAccountId })
   batch.set(doc(txCol(hid)), { ...base, type: 'income', accountId: toAccountId })
   batch.update(doc(accountCol(hid), fromAccountId), { balance: increment(balanceDelta('expense', amount, fromAccountType)) })
   batch.update(doc(accountCol(hid), toAccountId), { balance: increment(balanceDelta('income', amount, toAccountType)) })
+  await batch.commit()
+}
+
+export async function deleteTransfer(
+  hid: string,
+  transferId: string,
+  fromAccountId: string,
+  fromAccountType: AccountType,
+  toAccountId: string,
+  toAccountType: AccountType,
+  amount: number,
+): Promise<void> {
+  // find both legs by transferId
+  const snap = await getDocs(query(txCol(hid), where('transferId', '==', transferId)))
+  const batch = writeBatch(db)
+  snap.docs.forEach((d) => batch.delete(d.ref))
+  batch.update(doc(accountCol(hid), fromAccountId), { balance: increment(-balanceDelta('expense', amount, fromAccountType)) })
+  batch.update(doc(accountCol(hid), toAccountId), { balance: increment(-balanceDelta('income', amount, toAccountType)) })
   await batch.commit()
 }
 
@@ -85,22 +104,22 @@ export async function updateTransaction(
   id: string,
   oldT: Pick<Transaction, 'type' | 'amount' | 'accountId'>,
   newT: Partial<Omit<Transaction, 'id'>>,
-  accountType?: AccountType
+  oldAccountType?: AccountType,
+  newAccountType?: AccountType
 ): Promise<void> {
   const batch = writeBatch(db)
   batch.update(doc(txCol(hid), id), newT)
   const newAccountId = newT.accountId ?? oldT.accountId
   const newType = (newT.type ?? oldT.type) as TransactionType
   const newAmount = newT.amount ?? oldT.amount
-  if (accountType) {
-    if (oldT.accountId && oldT.accountId === newAccountId) {
-      // same account: combine into one increment to avoid batch last-write-wins clobbering the revert
-      const delta = balanceDelta(newType, newAmount, accountType) - balanceDelta(oldT.type, oldT.amount, accountType)
-      if (delta !== 0) batch.update(doc(accountCol(hid), oldT.accountId), { balance: increment(delta) })
-    } else {
-      if (oldT.accountId) batch.update(doc(accountCol(hid), oldT.accountId), { balance: increment(-balanceDelta(oldT.type, oldT.amount, accountType)) })
-      if (newAccountId) batch.update(doc(accountCol(hid), newAccountId), { balance: increment(balanceDelta(newType, newAmount, accountType)) })
-    }
+  const effectiveNewType = newAccountType ?? oldAccountType
+  if (oldT.accountId && oldT.accountId === newAccountId && oldAccountType) {
+    // same account: combine into one increment to avoid batch last-write-wins clobbering the revert
+    const delta = balanceDelta(newType, newAmount, oldAccountType) - balanceDelta(oldT.type, oldT.amount, oldAccountType)
+    if (delta !== 0) batch.update(doc(accountCol(hid), oldT.accountId), { balance: increment(delta) })
+  } else {
+    if (oldT.accountId && oldAccountType) batch.update(doc(accountCol(hid), oldT.accountId), { balance: increment(-balanceDelta(oldT.type, oldT.amount, oldAccountType)) })
+    if (newAccountId && effectiveNewType) batch.update(doc(accountCol(hid), newAccountId), { balance: increment(balanceDelta(newType, newAmount, effectiveNewType)) })
   }
   await batch.commit()
 }

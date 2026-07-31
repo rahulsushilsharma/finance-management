@@ -23,8 +23,8 @@ export function Dashboard() {
   const isCurrentMonth = selectedMonth === currentMonth()
 
   const { income, expenses, cashFlow, savingsRate, unlinkedCount } = useMemo(() => {
-    const income = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    const income = transactions.filter((t) => t.type === 'income' && !t.transferId).reduce((s, t) => s + t.amount, 0)
+    const expenses = transactions.filter((t) => t.type === 'expense' && !t.transferId).reduce((s, t) => s + t.amount, 0)
     const cashFlow = income - expenses
     const savingsRate = income > 0 ? Math.max(0, (cashFlow / income) * 100) : null
     const unlinkedCount = transactions.filter((t) => !t.accountId).length
@@ -228,21 +228,25 @@ export function Dashboard() {
             <ul className="divide-y divide-border">
               {sorted.map((t) => {
                 const isIncome = t.type === 'income'
+                const isTransfer = !!t.transferId
                 return (
                   <li key={t.id} className="flex items-center justify-between px-4 py-3 gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={cn(
                         'w-9 h-9 rounded-full flex items-center justify-center shrink-0',
-                        isIncome ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'
+                        isTransfer ? 'bg-blue-100 dark:bg-blue-900/40' : isIncome ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'
                       )}>
                         {isIncome
-                          ? <ArrowUpRight size={16} className="text-green-600 dark:text-green-400" />
-                          : <ArrowDownRight size={16} className="text-red-600 dark:text-red-400" />}
+                          ? <ArrowUpRight size={16} className={isTransfer ? 'text-blue-600 dark:text-blue-400' : 'text-green-600 dark:text-green-400'} />
+                          : <ArrowDownRight size={16} className={isTransfer ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'} />}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate leading-tight">{t.description}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-xs text-muted-foreground">{t.category}</span>
+                          {isTransfer
+                            ? <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded-full font-medium">Transfer {isIncome ? '↙ in' : '↗ out'}</span>
+                            : <span className="text-xs text-muted-foreground">{t.category}</span>
+                          }
                           {!t.accountId && accounts.length > 0 && (
                             <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 px-1.5 py-0.5 rounded-full font-medium">unlinked</span>
                           )}
@@ -250,7 +254,7 @@ export function Dashboard() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={cn('text-sm font-bold', isIncome ? 'text-green-600 dark:text-green-400' : 'text-foreground')}>
+                      <p className={cn('text-sm font-bold', isTransfer ? 'text-blue-600 dark:text-blue-400' : isIncome ? 'text-green-600 dark:text-green-400' : 'text-foreground')}>
                         {isIncome ? '+' : '-'}{formatCurrency(t.amount, currency)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">{format(parseISO(t.date), 'MMM d')}</p>

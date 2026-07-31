@@ -28,12 +28,12 @@ export function Analytics() {
 
   const { categoryData, totalExpense, totalIncome, topCategory } = useMemo(() => {
     const map: Record<string, number> = {}
-    transactions.filter((t) => t.type === 'expense').forEach((t) => {
+    transactions.filter((t) => t.type === 'expense' && !t.transferId).forEach((t) => {
       map[t.category] = (map[t.category] ?? 0) + t.amount
     })
     const categoryData = Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
     const totalExpense = categoryData.reduce((s, d) => s + d.value, 0)
-    const totalIncome = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const totalIncome = transactions.filter((t) => t.type === 'income' && !t.transferId).reduce((s, t) => s + t.amount, 0)
     const topCategory = categoryData[0] ?? null
     return { categoryData, totalExpense, totalIncome, topCategory }
   }, [transactions])
@@ -46,7 +46,7 @@ export function Analytics() {
 
   const memberSpending = useMemo(() => {
     const map: Record<string, number> = {}
-    transactions.filter((t) => t.type === 'expense' && t.addedBy).forEach((t) => {
+    transactions.filter((t) => t.type === 'expense' && !t.transferId && t.addedBy).forEach((t) => {
       const name = memberMap[t.addedBy!] ?? 'Unknown'
       map[name] = (map[name] ?? 0) + t.amount
     })
@@ -68,8 +68,8 @@ export function Analytics() {
       const m = format(subMonths(toMonthDate(selectedMonth), 5 - i), 'yyyy-MM')
       const label = format(toMonthDate(m), 'MMM')
       const txs = m === selectedMonth ? transactions : (pastMonthsData[m] ?? [])
-      const income = txs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-      const expense = txs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      const income = txs.filter((t) => t.type === 'income' && !t.transferId).reduce((s, t) => s + t.amount, 0)
+      const expense = txs.filter((t) => t.type === 'expense' && !t.transferId).reduce((s, t) => s + t.amount, 0)
       return { month: label, income, expense }
     })
   }, [transactions, selectedMonth, pastMonthsData])

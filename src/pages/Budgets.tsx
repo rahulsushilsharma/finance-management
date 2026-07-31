@@ -44,7 +44,7 @@ export function Budgets() {
 
   const { spentMap, totalBudgeted, totalSpent, overallPct } = useMemo(() => {
     const spentMap: Record<string, number> = {}
-    transactions.filter((t) => t.type === 'expense').forEach((t) => {
+    transactions.filter((t) => t.type === 'expense' && !t.transferId).forEach((t) => {
       spentMap[t.category] = (spentMap[t.category] ?? 0) + t.amount
     })
     const totalBudgeted = budgets.reduce((s, b) => s + b.monthlyLimit, 0)

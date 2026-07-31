@@ -13,6 +13,12 @@ export function TopBar({ title }: { title: string }) {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
+    // keep PWA status bar in sync with theme
+    document.querySelectorAll('meta[name="theme-color"]').forEach((el) => el.remove())
+    const meta = document.createElement('meta')
+    meta.name = 'theme-color'
+    meta.content = dark ? '#0f172a' : '#ffffff'
+    document.head.appendChild(meta)
   }, [dark])
 
   function handleInstallClick() {

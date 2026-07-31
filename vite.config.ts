@@ -18,7 +18,7 @@ export default defineConfig({
         short_name: 'Finance',
         description: 'Family finance tracker',
         theme_color: '#6366f1',
-        background_color: '#0f172a',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',

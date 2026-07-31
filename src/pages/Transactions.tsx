@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { useStore } from '@/store/useStore'
 import { useData } from '@/hooks/useData'
 import { useHousehold } from '@/hooks/useHousehold'
-import { deleteTransaction, updateTransaction } from '@/lib/firestore'
+import { deleteTransaction, deleteTransfer, updateTransaction } from '@/lib/firestore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -42,8 +42,10 @@ export function Transactions() {
   const [deleting, setDeleting] = useState(false)
 
   const { income, expenses, filtered } = useMemo(() => {
-    const income = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    // exclude transfer legs from income/expense totals — they cancel each other out
+    const nonTransfer = transactions.filter((t) => !t.transferId)
+    const income = nonTransfer.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const expenses = nonTransfer.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
     const filtered = transactions
       .filter((t) => filterType === 'all' || t.type === filterType)
       .filter((t) =>
@@ -64,11 +66,13 @@ export function Transactions() {
     if (!householdId || !editTx || saving) return
     setSaving(true)
     try {
+      const oldAccount = accounts.find((a) => a.id === editTx.accountId)
       const newAccount = accounts.find((a) => a.id === (editForm.accountId || editTx.accountId))
       await updateTransaction(
         householdId, editTx.id,
         { type: editTx.type, amount: editTx.amount, accountId: editTx.accountId },
         { amount: parseFloat(editForm.amount), description: editForm.description, category: editForm.category, date: editForm.date, accountId: editForm.accountId || undefined },
+        oldAccount?.type,
         newAccount?.type
       )
       toast.success('Transaction updated')
@@ -94,8 +98,20 @@ export function Transactions() {
     if (!householdId || !deleteId || !deleteTx || deleting) return
     setDeleting(true)
     try {
-      const account = accounts.find((a) => a.id === deleteTx.accountId)
-      await deleteTransaction(householdId, deleteId, deleteTx, account?.type)
+      if (deleteTx.transferId) {
+        // find both legs in the full transaction list
+        const legs = transactions.filter((t) => t.transferId === deleteTx.transferId)
+        const fromLeg = legs.find((t) => t.type === 'expense')
+        const toLeg = legs.find((t) => t.type === 'income')
+        const fromAccount = accounts.find((a) => a.id === fromLeg?.accountId)
+        const toAccount = accounts.find((a) => a.id === toLeg?.accountId)
+        if (fromLeg && toLeg && fromAccount && toAccount) {
+          await deleteTransfer(householdId, deleteTx.transferId, fromLeg.accountId!, fromAccount.type, toLeg.accountId!, toAccount.type, deleteTx.amount)
+        }
+      } else {
+        const account = accounts.find((a) => a.id === deleteTx.accountId)
+        await deleteTransaction(householdId, deleteId, deleteTx, account?.type)
+      }
       toast.success('Transaction deleted')
       setDeleteId(null)
       setDeleteTx(null)
@@ -197,22 +213,26 @@ export function Transactions() {
         <ul className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
           {filtered.map((t) => {
             const isIncome = t.type === 'income'
+            const isTransfer = !!t.transferId
             const account = accounts.find((a) => a.id === t.accountId)
             return (
               <li key={t.id} className="flex items-center justify-between px-4 py-3 gap-3 group hover:bg-muted/30 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={cn(
                     'w-9 h-9 rounded-full flex items-center justify-center shrink-0',
-                    isIncome ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'
+                    isTransfer ? 'bg-blue-100 dark:bg-blue-900/40' : isIncome ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'
                   )}>
                     {isIncome
-                      ? <ArrowUpRight size={16} className="text-green-600 dark:text-green-400" />
-                      : <ArrowDownRight size={16} className="text-red-600 dark:text-red-400" />}
+                      ? <ArrowUpRight size={16} className={isTransfer ? 'text-blue-600 dark:text-blue-400' : 'text-green-600 dark:text-green-400'} />
+                      : <ArrowDownRight size={16} className={isTransfer ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'} />}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate leading-tight">{t.description}</p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className="text-xs text-muted-foreground">{t.category}</span>
+                      {isTransfer
+                        ? <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded-full font-medium">Transfer {isIncome ? '↙ in' : '↗ out'}</span>
+                        : <span className="text-xs text-muted-foreground">{t.category}</span>
+                      }
                       <span className="text-xs text-muted-foreground">·</span>
                       <span className="text-xs text-muted-foreground">{format(parseISO(t.date), 'MMM d')}</span>
                       {account && (
@@ -228,13 +248,14 @@ export function Transactions() {
                   </div>
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
-                  <span className={cn('text-sm font-bold mr-1', isIncome ? 'text-green-600 dark:text-green-400' : 'text-foreground')}>
+                  <span className={cn('text-sm font-bold mr-1', isTransfer ? 'text-blue-600 dark:text-blue-400' : isIncome ? 'text-green-600 dark:text-green-400' : 'text-foreground')}>
                     {isIncome ? '+' : '−'}{formatCurrency(t.amount, currency)}
                   </span>
                   <Button
                     variant="ghost" size="icon"
-                    onClick={() => openEdit(t)}
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-muted-foreground hover:text-primary transition-opacity"
+                    onClick={() => !isTransfer && openEdit(t)}
+                    disabled={isTransfer}
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-muted-foreground hover:text-primary transition-opacity disabled:opacity-20"
                   >
                     <Pencil size={13} />
                   </Button>
